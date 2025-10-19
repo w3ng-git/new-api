@@ -1,0 +1,490 @@
+From c090ceaabd1928009186b560342425e0e94060ec Mon Sep 17 00:00:00 2001
+From: w3ng-git <asset1016@gmail.com>
+Date: Mon, 20 Oct 2025 01:20:14 +0800
+Subject: [PATCH] =?UTF-8?q?feat:=20=E9=85=8D=E7=BD=AE=E8=87=AA=E5=8A=A8?=
+ =?UTF-8?q?=E5=8C=96=E5=B7=A5=E4=BD=9C=E6=B5=81?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- 添加每日自动同步上游仓库的 workflow
+  - 每天北京时间 9:00 自动从 Calcium-Ion/new-api 同步最新更新
+  - 支持手动触发同步
+  - 遇到冲突时自动创建 issue 提醒
+
+- 配置 Docker 镜像自动构建和发布
+  - DockerHub: w3ng/new-api
+  - GHCR: ghcr.io/w3ng-git/new-api
+  - 支持 alpha 和 release 版本自动构建
+  - 支持 amd64 和 arm64 多架构
+
+- 添加 Docker 配置指南文档
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ .github/workflows/docker-image-alpha.yml |  18 +--
+ .github/workflows/docker-image-arm64.yml |  18 +--
+ .github/workflows/sync-upstream.yml      | 185 +++++++++++++++++++++++
+ DOCKER_SETUP_GUIDE.md                    | 162 ++++++++++++++++++++
+ 4 files changed, 365 insertions(+), 18 deletions(-)
+ create mode 100644 .github/workflows/sync-upstream.yml
+ create mode 100644 DOCKER_SETUP_GUIDE.md
+
+diff --git a/.github/workflows/docker-image-alpha.yml b/.github/workflows/docker-image-alpha.yml
+index 2a7d43ad..56ad46e2 100644
+--- a/.github/workflows/docker-image-alpha.yml
++++ b/.github/workflows/docker-image-alpha.yml
+@@ -66,7 +66,7 @@ jobs:
+         uses: docker/metadata-action@v5
+         with:
+           images: |
+-            calciumion/new-api
++            w3ng/new-api
+             ghcr.io/${{ env.GHCR_REPOSITORY }}
+ 
+       - name: Build & push single-arch (to both registries)
+@@ -76,8 +76,8 @@ jobs:
+           platforms: ${{ matrix.platform }}
+           push: true
+           tags: |
+-            calciumion/new-api:alpha-${{ matrix.arch }}
+-            calciumion/new-api:${{ steps.version.outputs.value }}-${{ matrix.arch }}
++            w3ng/new-api:alpha-${{ matrix.arch }}
++            w3ng/new-api:${{ steps.version.outputs.value }}-${{ matrix.arch }}
+             ghcr.io/${{ env.GHCR_REPOSITORY }}:alpha-${{ matrix.arch }}
+             ghcr.io/${{ env.GHCR_REPOSITORY }}:${{ steps.version.outputs.value }}-${{ matrix.arch }}
+           labels: ${{ steps.meta.outputs.labels }}
+@@ -118,16 +118,16 @@ jobs:
+       - name: Create & push manifest (Docker Hub - alpha)
+         run: |
+           docker buildx imagetools create \
+-            -t calciumion/new-api:alpha \
+-            calciumion/new-api:alpha-amd64 \
+-            calciumion/new-api:alpha-arm64
++            -t w3ng/new-api:alpha \
++            w3ng/new-api:alpha-amd64 \
++            w3ng/new-api:alpha-arm64
+ 
+       - name: Create & push manifest (Docker Hub - versioned alpha)
+         run: |
+           docker buildx imagetools create \
+-            -t calciumion/new-api:${VERSION} \
+-            calciumion/new-api:${VERSION}-amd64 \
+-            calciumion/new-api:${VERSION}-arm64
++            -t w3ng/new-api:${VERSION} \
++            w3ng/new-api:${VERSION}-amd64 \
++            w3ng/new-api:${VERSION}-arm64
+ 
+       - name: Log in to GHCR
+         uses: docker/login-action@v3
+diff --git a/.github/workflows/docker-image-arm64.yml b/.github/workflows/docker-image-arm64.yml
+index 78517af0..f6cdd748 100644
+--- a/.github/workflows/docker-image-arm64.yml
++++ b/.github/workflows/docker-image-arm64.yml
+@@ -63,7 +63,7 @@ jobs:
+         uses: docker/metadata-action@v5
+         with:
+           images: |
+-            calciumion/new-api
++            w3ng/new-api
+ #            ghcr.io/${{ env.GHCR_REPOSITORY }}
+ 
+       - name: Build & push single-arch (to both registries)
+@@ -73,8 +73,8 @@ jobs:
+           platforms: ${{ matrix.platform }}
+           push: true
+           tags: |
+-            calciumion/new-api:${{ env.TAG }}-${{ matrix.arch }}
+-            calciumion/new-api:latest-${{ matrix.arch }}
++            w3ng/new-api:${{ env.TAG }}-${{ matrix.arch }}
++            w3ng/new-api:latest-${{ matrix.arch }}
+ #            ghcr.io/${{ env.GHCR_REPOSITORY }}:${{ env.TAG }}-${{ matrix.arch }}
+ #            ghcr.io/${{ env.GHCR_REPOSITORY }}:latest-${{ matrix.arch }}
+           labels: ${{ steps.meta.outputs.labels }}
+@@ -104,16 +104,16 @@ jobs:
+       - name: Create & push manifest (Docker Hub - version)
+         run: |
+           docker buildx imagetools create \
+-            -t calciumion/new-api:${TAG} \
+-            calciumion/new-api:${TAG}-amd64 \
+-            calciumion/new-api:${TAG}-arm64
++            -t w3ng/new-api:${TAG} \
++            w3ng/new-api:${TAG}-amd64 \
++            w3ng/new-api:${TAG}-arm64
+ 
+       - name: Create & push manifest (Docker Hub - latest)
+         run: |
+           docker buildx imagetools create \
+-            -t calciumion/new-api:latest \
+-            calciumion/new-api:latest-amd64 \
+-            calciumion/new-api:latest-arm64
++            -t w3ng/new-api:latest \
++            w3ng/new-api:latest-amd64 \
++            w3ng/new-api:latest-arm64
+ 
+       # ---- GHCR ----
+ #      - name: Log in to GHCR
+diff --git a/.github/workflows/sync-upstream.yml b/.github/workflows/sync-upstream.yml
+new file mode 100644
+index 00000000..bbeda2a7
+--- /dev/null
++++ b/.github/workflows/sync-upstream.yml
+@@ -0,0 +1,185 @@
++name: Sync Upstream
++
++# 每天北京时间早上 9:00 (UTC 1:00) 自动同步
++on:
++  schedule:
++    - cron: '0 1 * * *'  # 每天 UTC 1:00 执行 (北京时间 9:00)
++  workflow_dispatch:  # 支持手动触发
++
++permissions:
++  contents: write
++  pull-requests: write
++
++jobs:
++  sync-upstream:
++    runs-on: ubuntu-latest
++
++    steps:
++      - name: Checkout repository
++        uses: actions/checkout@v4
++        with:
++          fetch-depth: 0
++          token: ${{ secrets.GITHUB_TOKEN }}
++
++      - name: Configure Git
++        run: |
++          git config user.name "github-actions[bot]"
++          git config user.email "github-actions[bot]@users.noreply.github.com"
++
++      - name: Add upstream remote
++        run: |
++          git remote add upstream https://github.com/Calcium-Ion/new-api.git || true
++          git remote -v
++
++      - name: Fetch upstream changes
++        run: |
++          git fetch upstream
++          git fetch origin
++
++      - name: Check for updates
++        id: check_updates
++        run: |
++          LOCAL_COMMIT=$(git rev-parse HEAD)
++          UPSTREAM_COMMIT=$(git rev-parse upstream/main)
++
++          echo "local_commit=$LOCAL_COMMIT" >> $GITHUB_OUTPUT
++          echo "upstream_commit=$UPSTREAM_COMMIT" >> $GITHUB_OUTPUT
++
++          if [ "$LOCAL_COMMIT" != "$UPSTREAM_COMMIT" ]; then
++            echo "has_updates=true" >> $GITHUB_OUTPUT
++            echo "✨ 检测到上游有新的更新"
++          else
++            echo "has_updates=false" >> $GITHUB_OUTPUT
++            echo "✅ 已经是最新版本"
++          fi
++
++      - name: Sync with upstream
++        if: steps.check_updates.outputs.has_updates == 'true'
++        run: |
++          # 尝试合并上游更新
++          if git merge upstream/main --no-edit; then
++            echo "✅ 成功合并上游更新"
++            echo "merge_status=success" >> $GITHUB_ENV
++          else
++            echo "⚠️  合并时发生冲突"
++            echo "merge_status=conflict" >> $GITHUB_ENV
++            git merge --abort
++          fi
++
++      - name: Push changes
++        if: steps.check_updates.outputs.has_updates == 'true' && env.merge_status == 'success'
++        run: |
++          git push origin main
++          echo "✅ 已推送更新到 fork 仓库"
++
++      - name: Create conflict issue
++        if: steps.check_updates.outputs.has_updates == 'true' && env.merge_status == 'conflict'
++        uses: actions/github-script@v7
++        with:
++          script: |
++            const title = '⚠️ 上游同步失败：存在合并冲突';
++            const body = `
++            ## 同步上游时发生冲突
++
++            在尝试从 [Calcium-Ion/new-api](https://github.com/Calcium-Ion/new-api) 同步最新更新时遇到合并冲突。
++
++            ### 详细信息
++            - **本地 commit**: \`${{ steps.check_updates.outputs.local_commit }}\`
++            - **上游 commit**: \`${{ steps.check_updates.outputs.upstream_commit }}\`
++            - **时间**: ${new Date().toISOString()}
++
++            ### 需要手动处理
++            请按照以下步骤手动解决冲突：
++
++            \`\`\`bash
++            # 1. 添加上游仓库（如果还没有）
++            git remote add upstream https://github.com/Calcium-Ion/new-api.git
++
++            # 2. 拉取上游更新
++            git fetch upstream
++
++            # 3. 合并上游 main 分支
++            git merge upstream/main
++
++            # 4. 解决冲突后提交
++            git add .
++            git commit -m "chore: 解决与上游的合并冲突"
++
++            # 5. 推送到远程仓库
++            git push origin main
++            \`\`\`
++
++            解决冲突后，此 issue 会自动关闭。
++            `;
++
++            // 检查是否已存在相同标题的 open issue
++            const issues = await github.rest.issues.listForRepo({
++              owner: context.repo.owner,
++              repo: context.repo.repo,
++              state: 'open',
++              labels: ['sync-conflict']
++            });
++
++            const existingIssue = issues.data.find(issue => issue.title === title);
++
++            if (!existingIssue) {
++              await github.rest.issues.create({
++                owner: context.repo.owner,
++                repo: context.repo.repo,
++                title: title,
++                body: body,
++                labels: ['sync-conflict', 'bot']
++              });
++              console.log('✅ 已创建冲突提醒 issue');
++            } else {
++              console.log('ℹ️  已存在冲突提醒 issue，跳过创建');
++            }
++
++      - name: Close resolved conflict issues
++        if: steps.check_updates.outputs.has_updates == 'true' && env.merge_status == 'success'
++        uses: actions/github-script@v7
++        with:
++          script: |
++            const issues = await github.rest.issues.listForRepo({
++              owner: context.repo.owner,
++              repo: context.repo.repo,
++              state: 'open',
++              labels: ['sync-conflict']
++            });
++
++            for (const issue of issues.data) {
++              await github.rest.issues.update({
++                owner: context.repo.owner,
++                repo: context.repo.repo,
++                issue_number: issue.number,
++                state: 'closed'
++              });
++
++              await github.rest.issues.createComment({
++                owner: context.repo.owner,
++                repo: context.repo.repo,
++                issue_number: issue.number,
++                body: '✅ 冲突已解决，上游更新已成功同步。'
++              });
++
++              console.log(`✅ 已关闭 issue #${issue.number}`);
++            }
++
++      - name: Summary
++        if: always()
++        run: |
++          echo "## 同步结果" >> $GITHUB_STEP_SUMMARY
++          echo "" >> $GITHUB_STEP_SUMMARY
++
++          if [ "${{ steps.check_updates.outputs.has_updates }}" == "true" ]; then
++            if [ "${{ env.merge_status }}" == "success" ]; then
++              echo "✅ **成功**: 已同步上游最新更新" >> $GITHUB_STEP_SUMMARY
++              echo "- 本地 commit: \`${{ steps.check_updates.outputs.local_commit }}\`" >> $GITHUB_STEP_SUMMARY
++              echo "- 上游 commit: \`${{ steps.check_updates.outputs.upstream_commit }}\`" >> $GITHUB_STEP_SUMMARY
++            else
++              echo "⚠️  **警告**: 同步失败，存在合并冲突" >> $GITHUB_STEP_SUMMARY
++              echo "- 已创建 issue 提醒，请手动处理冲突" >> $GITHUB_STEP_SUMMARY
++            fi
++          else
++            echo "ℹ️  **信息**: 已经是最新版本，无需同步" >> $GITHUB_STEP_SUMMARY
++          fi
+diff --git a/DOCKER_SETUP_GUIDE.md b/DOCKER_SETUP_GUIDE.md
+new file mode 100644
+index 00000000..298b7935
+--- /dev/null
++++ b/DOCKER_SETUP_GUIDE.md
+@@ -0,0 +1,162 @@
++# Docker 双发布配置指南
++
++本指南将帮助你配置自动构建和发布 Docker 镜像到 DockerHub 和 GitHub Container Registry (GHCR)。
++
++## 📋 前置要求
++
++- GitHub 账号（已有）
++- 需要创建：DockerHub 账号
++
++---
++
++## 第一步：创建 DockerHub 账号和 Access Token
++
++### 1.1 注册 DockerHub 账号
++
++1. 访问 [https://hub.docker.com/signup](https://hub.docker.com/signup)
++2. 填写信息注册账号（建议用户名简短，例如：`w3ng`）
++3. 验证邮箱
++
++### 1.2 创建 Access Token
++
++1. 登录 DockerHub 后，点击右上角头像
++2. 选择 **Account Settings**
++3. 左侧菜单选择 **Security**
++4. 点击 **New Access Token** 按钮
++5. 填写信息：
++   - **Description**: `GitHub Actions for new-api`
++   - **Access permissions**: 选择 **Read, Write, Delete**
++6. 点击 **Generate**
++7. **重要**：立即复制生成的 token（只显示一次！）
++
++示例 token 格式：`dckr_pat_xxxxxxxxxxxxxxxxxxxx`
++
++---
++
++## 第二步：在 GitHub 仓库添加 Secrets
++
++### 2.1 访问 Secrets 设置页面
++
++1. 打开你的 GitHub 仓库：[https://github.com/w3ng-git/new-api](https://github.com/w3ng-git/new-api)
++2. 点击 **Settings** 标签
++3. 左侧菜单展开 **Secrets and variables** → 选择 **Actions**
++
++### 2.2 添加 DOCKERHUB_USERNAME
++
++1. 点击 **New repository secret** 按钮
++2. 填写：
++   - **Name**: `DOCKERHUB_USERNAME`
++   - **Secret**: 你的 DockerHub 用户名（例如：`w3ng`）
++3. 点击 **Add secret**
++
++### 2.3 添加 DOCKERHUB_TOKEN
++
++1. 再次点击 **New repository secret**
++2. 填写：
++   - **Name**: `DOCKERHUB_TOKEN`
++   - **Secret**: 粘贴刚才复制的 Access Token
++3. 点击 **Add secret**
++
++完成后你应该看到两个 secrets：
++- ✅ DOCKERHUB_USERNAME
++- ✅ DOCKERHUB_TOKEN
++
++---
++
++## 第三步：修改 Workflow 文件
++
++已经帮你准备好了修改后的文件，你需要确认你的 DockerHub 用户名。
++
++**你的 DockerHub 用户名是什么？**
++
++假设是 `w3ng`，那么镜像地址将是：
++- DockerHub: `w3ng/new-api`
++- GHCR: `ghcr.io/w3ng-git/new-api`
++
++---
++
++## 第四步：测试配置
++
++### 4.1 推送 workflow 更新
++
++```bash
++git add .github/workflows/
++git commit -m "chore: 配置自己的 DockerHub 账号"
++git push
++```
++
++### 4.2 手动触发测试
++
++1. 访问：[https://github.com/w3ng-git/new-api/actions](https://github.com/w3ng-git/new-api/actions)
++2. 选择 **Publish Docker image (alpha)** workflow
++3. 点击 **Run workflow** → 选择 `main` 分支
++4. 点击 **Run workflow** 按钮开始构建
++
++### 4.3 查看构建结果
++
++构建大约需要 10-20 分钟，成功后可以在这里查看：
++
++- DockerHub: `https://hub.docker.com/r/<你的用户名>/new-api`
++- GHCR: `https://github.com/w3ng-git/new-api/pkgs/container/new-api`
++
++---
++
++## 使用镜像
++
++构建完成后，可以这样拉取镜像：
++
++```bash
++# 从 DockerHub 拉取
++docker pull w3ng/new-api:alpha
++
++# 从 GHCR 拉取
++docker pull ghcr.io/w3ng-git/new-api:alpha
++
++# 运行容器
++docker run -d -p 3000:3000 w3ng/new-api:alpha
++```
++
++---
++
++## 自动触发说明
++
++配置完成后，以下情况会自动构建和发布镜像：
++
++1. **推送到 alpha 分支**: 自动构建 `alpha` 标签镜像
++2. **创建 Git Tag**: 自动构建发布版本镜像
++3. **手动触发**: 随时可以在 Actions 页面手动触发
++
++---
++
++## 常见问题
++
++### Q: GHCR 镜像是公开的吗？
++A: 默认是私有的，需要在仓库设置中修改。
++
++**如何公开 GHCR 镜像：**
++1. 访问：[https://github.com/users/w3ng-git/packages/container/new-api/settings](https://github.com/users/w3ng-git/packages/container/new-api/settings)
++2. 滚动到最下方 **Danger Zone**
++3. 点击 **Change visibility** → 选择 **Public**
++
++### Q: 构建失败怎么办？
++A: 查看 Actions 日志，常见原因：
++- Secrets 配置错误
++- DockerHub 用户名或 token 错误
++- 网络问题
++
++### Q: 如何删除旧的镜像？
++A:
++- DockerHub: 登录后在镜像页面删除标签
++- GHCR: 在 GitHub Packages 页面删除版本
++
++---
++
++## 下一步
++
++配置完成后，建议：
++
++1. ✅ 修改 `docker-compose.yml`，使用你自己的镜像
++2. ✅ 更新 README.md，添加你的镜像拉取命令
++3. ✅ 测试一次完整的构建流程
++
++需要帮助？随时问我！
+-- 
+2.39.5 (Apple Git-154)
+

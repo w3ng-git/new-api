@@ -16,7 +16,8 @@ version: '3.4' # For compatibility with older Docker versions
 
 services:
   new-api:
-    image: calciumion/new-api:latest
+    image: w3ng/new-api:latest  # 使用自己的 DockerHub 镜像
+    # 或者使用 GHCR: ghcr.io/w3ng-git/new-api:latest
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
